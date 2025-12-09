@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+python-multipart
+opencv-python-headless
+numpy
+pillow
+insightface
+onnxruntime-gpu
+deep-sort-realtime
+cryptography
+supabase
+python-dotenv
+aiofiles
+websockets
+python-jose[cryptography]
+passlib[bcrypt]
