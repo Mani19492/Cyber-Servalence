@@ -1,56 +1,80 @@
 from supabase import create_client
 from .config import settings
 
-supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+supabase = create_client(settings.supabase_url, settings.supabase_key)
 
-# -------- Users -------- #
-
-def create_user(email: str, hashed_password: str, role: str = "viewer"):
-    return supabase.table("users").insert({
-        "email": email,
-        "hashed_password": hashed_password,
-        "role": role
-    }).execute().data[0]
+# ---------------------- USERS TABLE ----------------------
 
 def get_user_by_email(email: str):
-    res = supabase.table("users").select("*").eq("email", email).execute()
-    if res.data:
-        return res.data[0]
+    r = supabase.table("users").select("*").eq("email", email).execute()
+    if r.data:
+        return r.data[0]
     return None
 
-# -------- Persons -------- #
+def create_user(email: str, password: str):
+    supabase.table("users").insert({
+        "email": email,
+        "hashed_password": password  # Database uses hashed_password
+    }).execute()
 
-def insert_person(name: str, metadata: dict, embedding: str):
+# ---------------------- PERSONS TABLE ----------------------
+
+def insert_person(name: str, embedding: list):
+    # Convert embedding list to JSON string for text storage
+    import json
+    embedding_json = json.dumps(embedding)
     return supabase.table("persons").insert({
         "name": name,
-        "metadata": metadata,
-        "embedding": embedding
-    }).execute().data[0]
+        "embedding": embedding_json
+    }).execute()
 
 def get_all_persons():
-    return supabase.table("persons").select("*").execute().data
+    r = supabase.table("persons").select("*").execute()
+    # Parse embedding from JSON string back to list
+    import json
+    if r.data:
+        for person in r.data:
+            if person.get("embedding") and isinstance(person["embedding"], str):
+                try:
+                    person["embedding"] = json.loads(person["embedding"])
+                except:
+                    person["embedding"] = []
+    return r.data
 
-# -------- Cameras -------- #
+# ---------------------- CAMERAS TABLE ----------------------
 
-def insert_camera(id_: str, rtsp_url: str, location: str = "", metadata: dict = None):
-    return supabase.table("cameras").insert({
-        "id": id_,
-        "rtsp_url": rtsp_url,
-        "location": location,
-        "metadata": metadata or {}
-    }).execute().data[0]
+def insert_camera(name: str, url: str, camera_id: str = None):
+    # Database uses id as TEXT primary key and rtsp_url instead of url
+    camera_id = camera_id or name.lower().replace(" ", "_")
+    supabase.table("cameras").insert({
+        "id": camera_id,
+        "rtsp_url": url,
+        "location": name
+    }).execute()
 
 def get_all_cameras():
-    return supabase.table("cameras").select("*").execute().data
+    r = supabase.table("cameras").select("*").execute()
+    # Map database fields to frontend expected fields
+    if r.data:
+        for camera in r.data:
+            # Map rtsp_url to url for frontend compatibility
+            if "rtsp_url" in camera:
+                camera["url"] = camera["rtsp_url"]
+            # Map location to name if name is not set
+            if "location" in camera and camera["location"]:
+                if "name" not in camera or not camera["name"]:
+                    camera["name"] = camera["location"]
+    return r.data
 
-# -------- Detections -------- #
+# ---------------------- DETECTIONS TABLE ----------------------
 
-def insert_detection(person_id, camera_id, timestamp, confidence, snapshot_path, raw_metadata=None):
-    return supabase.table("detections").insert({
+def insert_detection(person_id, camera_id, confidence, snapshot_url):
+    # Database uses snapshot_path instead of snapshot_url
+    from datetime import datetime
+    supabase.table("detections").insert({
         "person_id": person_id,
         "camera_id": camera_id,
-        "timestamp": timestamp,
-        "confidence": confidence,
-        "snapshot_path": snapshot_path,
-        "raw_metadata": raw_metadata or {}
-    }).execute().data[0]
+        "confidence": float(confidence),
+        "snapshot_path": snapshot_url,
+        "timestamp": datetime.utcnow().isoformat()
+    }).execute()
