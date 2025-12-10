@@ -11,10 +11,10 @@ def get_user_by_email(email: str):
         return r.data[0]
     return None
 
-def create_user(email: str, password: str):
+def create_user(email: str, password: str = ""):
     supabase.table("users").insert({
         "email": email,
-        "hashed_password": password  # Database uses hashed_password
+        "password": password  # Password not used anymore, but keep for schema compatibility
     }).execute()
 
 # ---------------------- PERSONS TABLE ----------------------

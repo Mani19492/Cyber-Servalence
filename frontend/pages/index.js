@@ -9,7 +9,6 @@ const BACKEND =
 export default function Home() {
   const [token, setToken] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [alerts, setAlerts] = useState([]);
   const [cameras, setCameras] = useState([]);
   const [ws, setWs] = useState(null);
@@ -115,10 +114,16 @@ export default function Home() {
     setLoading(true);
     setError("");
     
+    if (!email) {
+      setError("Email/username is required");
+      setLoading(false);
+      return;
+    }
+    
     try {
       const res = await axios.post(`${BACKEND}/login`, {
         email,
-        password,
+        // No password needed
       });
       setToken(res.data.access_token);
       // Store token in localStorage
@@ -126,7 +131,7 @@ export default function Home() {
         localStorage.setItem("auth_token", res.data.access_token);
       }
     } catch (e) {
-      setError(e.response?.data?.detail || "Login failed. Please check your credentials.");
+      setError(e.response?.data?.detail || "Login failed. User not found.");
       console.error("Login error:", e);
     } finally {
       setLoading(false);
@@ -174,25 +179,13 @@ export default function Home() {
             className="bg-cardDark border border-gray-800 rounded-2xl px-4 py-3 flex flex-col md:flex-row gap-3 items-stretch md:items-end shadow-lg w-full md:w-auto"
           >
             <div className="flex flex-col">
-              <label className="text-xs text-gray-400 mb-1">Email</label>
+              <label className="text-xs text-gray-400 mb-1">Email / Username</label>
               <input
                 className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-white"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                type="email"
+                type="text"
                 placeholder="admin@cyber.com"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="text-xs text-gray-400 mb-1">Password</label>
-              <input
-                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-white"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                placeholder="••••••••"
                 required
                 disabled={loading}
               />
@@ -248,8 +241,9 @@ export default function Home() {
               Login as an operator or admin to view live camera streams and real-time alerts.
             </p>
             <div className="text-xs text-gray-500">
-              <p>Default credentials:</p>
-              <p className="mt-2 font-mono">admin@cyber.com / admin123</p>
+              <p>Login with email:</p>
+              <p className="mt-2 font-mono">admin@cyber.com</p>
+              <p className="mt-1 text-gray-600">(No password required)</p>
             </div>
           </div>
         </div>

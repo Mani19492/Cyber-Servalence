@@ -9,10 +9,11 @@
 -- =====================================================
 
 -- Users table for authentication
+-- No password required - login with email/username only
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE NOT NULL,
-    hashed_password TEXT NOT NULL,
+    password TEXT,  -- Optional field (not used for authentication)
     role TEXT NOT NULL DEFAULT 'viewer',
     created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -59,18 +60,14 @@ CREATE INDEX IF NOT EXISTS idx_detections_timestamp ON detections(timestamp);
 -- 2. CREATE ADMIN USER
 -- =====================================================
 
--- Insert admin user with hashed password (admin123)
--- The password hash is verified to work with bcrypt.checkpw()
-INSERT INTO users (email, hashed_password, role)
+-- Insert admin user (no password needed)
+INSERT INTO users (email, role)
 VALUES (
     'admin@cyber.com',
-    '$2b$12$8snmfPTbSjzN33Uf4ZZSkeWKnX/scYP1hXDwXSTP5llR2vUTYJaR2',
     'admin'
 )
 ON CONFLICT (email) DO UPDATE
-SET 
-    hashed_password = EXCLUDED.hashed_password,
-    role = EXCLUDED.role;
+SET role = EXCLUDED.role;
 
 -- =====================================================
 -- 3. VERIFY SETUP

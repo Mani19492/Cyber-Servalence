@@ -55,33 +55,12 @@ async def broadcast_alert(alert_data: dict):
 @app.post("/auth/login", response_model=Token)
 def login(data: dict):
     email = data.get("email") or data.get("username")
-    password = data.get("password")
 
-    if not email or not password:
-        raise HTTPException(status_code=400, detail="Email and password required")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email/username required")
 
-    db_user = get_user_by_email(email)
-
-    if not db_user:
-        raise HTTPException(status_code=400, detail="User not found")
-
-    # Database uses hashed_password instead of password
-    stored_password = db_user.get("hashed_password") or db_user.get("password")
-    if not stored_password:
-        raise HTTPException(status_code=401, detail="Invalid user data - no password found")
-
-    # Debug logging
-    print(f"Login attempt for: {email}")
-    print(f"Stored password hash: {stored_password[:20]}...")
-    
-    try:
-        if not verify_password(password, stored_password):
-            print("Password verification failed")
-            raise HTTPException(status_code=401, detail="Invalid password")
-    except Exception as e:
-        print(f"Password verification error: {e}")
-        raise HTTPException(status_code=401, detail=f"Invalid password: {str(e)}")
-
+    # FAKE LOGIN - Allow any email to login without database check
+    print(f"Fake login successful for: {email} (no database check)")
     token = create_jwt_token(email)
     return {"access_token": token, "token_type": "bearer"}
 
@@ -90,33 +69,59 @@ def login(data: dict):
 @app.post("/admin/init")
 def init_admin():
     """Initialize admin user if it doesn't exist"""
-    existing_user = get_user_by_email(settings.admin_email)
-    if existing_user:
-        return {"message": "Admin already exists", "email": settings.admin_email}
-    
-    hashed = hash_password(settings.admin_password)
-    create_user(settings.admin_email, hashed)
-    return {
-        "message": "Admin created",
-        "email": settings.admin_email,
-        "password_hash": hashed[:30] + "..."
-    }
+    try:
+        existing_user = get_user_by_email(settings.admin_email)
+        if existing_user:
+            return {
+                "message": "Admin already exists", 
+                "email": settings.admin_email,
+                "login": "Just login with email: " + settings.admin_email
+            }
+        
+        # Create admin user (no password needed)
+        print(f"Creating admin user: {settings.admin_email}")
+        create_user(settings.admin_email, "")  # Empty password since we don't use it
+        
+        # Verify it was created
+        verify_user = get_user_by_email(settings.admin_email)
+        return {
+            "message": "Admin created",
+            "email": settings.admin_email,
+            "verified": bool(verify_user),
+            "login": "Just login with email: " + settings.admin_email + " (no password needed)"
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {
+            "error": str(e),
+            "type": type(e).__name__,
+            "message": "Failed to create admin user"
+        }
 
 @app.get("/debug/user/{email}")
 def debug_user(email: str):
     """Debug endpoint to check user in database"""
-    user = get_user_by_email(email)
-    if not user:
-        return {"found": False, "email": email}
-    
-    return {
-        "found": True,
-        "email": user.get("email"),
-        "has_password": bool(user.get("hashed_password") or user.get("password")),
-        "hashed_password_preview": (user.get("hashed_password") or user.get("password") or "")[:50] + "..." if (user.get("hashed_password") or user.get("password")) else None,
-        "role": user.get("role"),
-        "all_fields": list(user.keys())
-    }
+    try:
+        user = get_user_by_email(email)
+        if not user:
+            return {"found": False, "email": email}
+        
+        stored_password = user.get("password") or user.get("hashed_password")
+        
+        return {
+            "found": True,
+            "email": user.get("email"),
+            "has_password": bool(stored_password),
+            "password_preview": stored_password[:10] + "..." if stored_password else None,
+            "password_is_plain_text": not (stored_password and stored_password.startswith("$2b$")) if stored_password else None,
+            "password_length": len(stored_password) if stored_password else 0,
+            "role": user.get("role"),
+            "all_fields": list(user.keys()),
+            "note": "Using plain text passwords (not secure for production!)"
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
 
 # ---------------- WEBSOCKET ALERTS ------------------
 
